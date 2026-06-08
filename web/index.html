@@ -2243,25 +2243,18 @@
             <div class="card">
                 <div class="card-header"><span class="card-title" data-i18n="api.endpoints"></span></div>
                 <p style="margin-bottom:10px;font-weight:500;font-size:14px">Claude API</p>
-                <div class="endpoint"><span id="claudeEndpoint"></span>
-                    <button class="btn btn-sm btn-secondary" onclick="copy('claudeEndpoint')" data-i18n="common.copy"></button>
-                    <button class="btn btn-sm btn-primary" onclick="testEndpoint('claude')" data-i18n="api.test"></button>
-                </div>
+                <div class="endpoint"><span id="claudeEndpoint"></span><button class="btn btn-sm btn-secondary"
+                        onclick="copy('claudeEndpoint')" data-i18n="common.copy"></button></div>
                 <p style="margin:14px 0 10px;font-weight:500;font-size:14px">OpenAI API</p>
-                <div class="endpoint"><span id="openaiEndpoint"></span>
-                    <button class="btn btn-sm btn-secondary" onclick="copy('openaiEndpoint')" data-i18n="common.copy"></button>
-                    <button class="btn btn-sm btn-primary" onclick="testEndpoint('openai')" data-i18n="api.test"></button>
-                </div>
+                <div class="endpoint"><span id="openaiEndpoint"></span><button class="btn btn-sm btn-secondary"
+                        onclick="copy('openaiEndpoint')" data-i18n="common.copy"></button></div>
                 <p style="margin:14px 0 10px;font-weight:500;font-size:14px" data-i18n="api.modelList"></p>
-                <div class="endpoint"><span id="modelsEndpoint"></span>
-                    <button class="btn btn-sm btn-secondary" onclick="copy('modelsEndpoint')" data-i18n="common.copy"></button>
-                    <button class="btn btn-sm btn-primary" onclick="testEndpoint('models')" data-i18n="api.test"></button>
-                </div>
+                <div class="endpoint"><span id="modelsEndpoint"></span><button class="btn btn-sm btn-secondary"
+                        onclick="copy('modelsEndpoint')" data-i18n="common.copy"></button></div>
                 <p style="margin:14px 0 10px;font-weight:500;font-size:14px" data-i18n="api.stats"></p>
                 <div class="endpoint"><span id="statsEndpoint"></span><button class="btn btn-sm btn-secondary"
                         onclick="copy('statsEndpoint')" data-i18n="common.copy"></button></div>
                 <p style="font-size:12px;color:#64748b;margin-top:4px" data-i18n="api.statsHint"></p>
-                <div id="endpointTestResult" style="margin-top:10px"></div>
             </div>
             <div class="card">
                 <div class="card-header">
@@ -2575,10 +2568,6 @@
                 "api.modelList": "Danh sách model",
                 "api.stats": "Dữ liệu thống kê",
                 "api.statsHint": "Cần gửi API Key trong header (Authorization: Bearer sk-xxx). Không cần xác thực nếu chưa bật xác thực API Key.",
-                "api.test": "Test",
-                "api.testing": "Đang test...",
-                "api.testOk": "Endpoint hoạt động",
-                "api.testFail": "Endpoint lỗi",
                 "detail.title": "Chi tiết tài khoản",
                 "detail.basicInfo": "Thông tin cơ bản",
                 "detail.email": "Email",
@@ -2940,10 +2929,6 @@
                 'api.modelList': 'Model List',
                 'api.stats': 'Statistics',
                 'api.statsHint': 'Requires API Key in header (Authorization: Bearer sk-xxx). No auth needed if API Key verification is disabled.',
-                'api.test': 'Test',
-                'api.testing': 'Testing...',
-                'api.testOk': 'Endpoint is working',
-                'api.testFail': 'Endpoint failed',
                 'detail.title': 'Account Details',
                 'detail.basicInfo': 'Basic Info',
                 'detail.email': 'Email',
@@ -3305,10 +3290,6 @@
                 "api.modelList": "模型列表",
                 "api.stats": "统计数据",
                 "api.statsHint": "需在请求头中携带 API Key（Authorization: Bearer sk-xxx）。若未启用 API Key 校验则无需认证。",
-                "api.test": "测试",
-                "api.testing": "测试中...",
-                "api.testOk": "端点正常",
-                "api.testFail": "端点错误",
                 "detail.title": "账号详情",
                 "detail.basicInfo": "基本信息",
                 "detail.email": "邮箱",
@@ -4930,60 +4911,6 @@
 
         async function loadConsole() {
             await Promise.all([loadSystemInfo(), loadLogs()]);
-        }
-
-        // Test an API endpoint with a real minimal request through the gateway.
-        async function testEndpoint(kind) {
-            const resultEl = document.getElementById('endpointTestResult');
-            const apiKey = await getEffectiveApiKey();
-            const headers = { 'Content-Type': 'application/json' };
-            if (apiKey) headers['Authorization'] = 'Bearer ' + apiKey;
-            if (resultEl) resultEl.innerHTML = '<span style="color:#64748b;font-size:13px">⏳ ' + t('api.testing') + '</span>';
-            const started = Date.now();
-            try {
-                let url, opts;
-                if (kind === 'models') {
-                    url = baseUrl + '/v1/models';
-                    opts = { method: 'GET', headers };
-                } else if (kind === 'claude') {
-                    url = baseUrl + '/v1/messages';
-                    headers['anthropic-version'] = '2023-06-01';
-                    opts = { method: 'POST', headers, body: JSON.stringify({ model: 'claude-sonnet-4', max_tokens: 16, messages: [{ role: 'user', content: 'ping' }] }) };
-                } else {
-                    url = baseUrl + '/v1/chat/completions';
-                    opts = { method: 'POST', headers, body: JSON.stringify({ model: 'gpt-4o', max_tokens: 16, messages: [{ role: 'user', content: 'ping' }] }) };
-                }
-                const res = await fetch(url, opts);
-                const elapsed = ((Date.now() - started) / 1000).toFixed(2);
-                const body = await res.text();
-                const ok = res.ok;
-                const preview = body.length > 300 ? body.slice(0, 300) + '…' : body;
-                if (resultEl) {
-                    resultEl.innerHTML =
-                        '<div class="log-console" style="max-height:200px">' +
-                        '<div class="log-line ' + (ok ? 'log-lv-info' : 'log-lv-error') + '">' +
-                        '<span class="log-level">' + (ok ? 'OK ' + res.status : 'ERR ' + res.status) + '</span>' +
-                        '<span class="log-msg">' + escapeHtml(elapsed) + 's — ' + escapeHtml(preview) + '</span>' +
-                        '</div></div>';
-                }
-                showToast((ok ? t('api.testOk') : t('api.testFail')) + ' (' + res.status + ', ' + elapsed + 's)', ok ? 'success' : 'error');
-            } catch (e) {
-                if (resultEl) resultEl.innerHTML = '<span style="color:#dc2626;font-size:13px">✕ ' + escapeHtml(e.message) + '</span>';
-                showToast(t('api.testFail') + ': ' + e.message, 'error');
-            }
-        }
-
-        // Resolve the API key to use for endpoint tests (only if required).
-        async function getEffectiveApiKey() {
-            try {
-                const res = await fetch('/admin/api/settings', { headers: { 'X-Admin-Password': password } });
-                const d = await res.json();
-                if (d.requireApiKey) {
-                    if (Array.isArray(d.apiKeys) && d.apiKeys.length) return d.apiKeys[0];
-                    if (d.apiKey) return d.apiKey;
-                }
-            } catch (e) {}
-            return '';
         }
 
         async function loadSystemInfo() {
