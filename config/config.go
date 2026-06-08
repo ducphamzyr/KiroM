@@ -278,11 +278,12 @@ type PromptFilterRule struct {
 // Config represents the global application configuration.
 type Config struct {
 	// Server settings
-	Password      string    `json:"password"`         // Admin panel password
-	Port          int       `json:"port"`             // HTTP server port (default: 8080)
-	Host          string    `json:"host"`             // HTTP server bind address (default: 0.0.0.0)
-	ApiKey        string    `json:"apiKey,omitempty"` // API key for client authentication
-	RequireApiKey bool      `json:"requireApiKey"`    // Whether to enforce API key validation
+	Password      string    `json:"password"`          // Admin panel password
+	Port          int       `json:"port"`              // HTTP server port (default: 8080)
+	Host          string    `json:"host"`              // HTTP server bind address (default: 0.0.0.0)
+	ApiKey        string    `json:"apiKey,omitempty"`  // API key for client authentication
+	ApiKeys       []string  `json:"apiKeys,omitempty"` // Additional API keys accepted for client authentication
+	RequireApiKey bool      `json:"requireApiKey"`     // Whether to enforce API key validation
 	KiroVersion   string    `json:"kiroVersion,omitempty"`
 	SystemVersion string    `json:"systemVersion,omitempty"`
 	NodeVersion   string    `json:"nodeVersion,omitempty"`
@@ -603,16 +604,47 @@ func GetApiKey() string {
 	return cfg.ApiKey
 }
 
+func normalizeApiKeys(keys []string) []string {
+	seen := make(map[string]bool)
+	normalized := make([]string, 0, len(keys))
+	for _, key := range keys {
+		key = strings.TrimSpace(key)
+		if key == "" || seen[key] {
+			continue
+		}
+		seen[key] = true
+		normalized = append(normalized, key)
+	}
+	return normalized
+}
+
+func GetApiKeys() []string {
+	cfgLock.RLock()
+	defer cfgLock.RUnlock()
+	keys := normalizeApiKeys(append([]string{cfg.ApiKey}, cfg.ApiKeys...))
+	out := make([]string, len(keys))
+	copy(out, keys)
+	return out
+}
+
 func IsApiKeyRequired() bool {
 	cfgLock.RLock()
 	defer cfgLock.RUnlock()
 	return cfg.RequireApiKey
 }
 
-func UpdateSettings(apiKey string, requireApiKey bool, password string) error {
+func UpdateSettings(apiKey string, apiKeys []string, requireApiKey bool, password string) error {
 	cfgLock.Lock()
 	defer cfgLock.Unlock()
-	cfg.ApiKey = apiKey
+	keys := normalizeApiKeys(append([]string{apiKey}, apiKeys...))
+	cfg.ApiKey = ""
+	cfg.ApiKeys = nil
+	if len(keys) > 0 {
+		cfg.ApiKey = keys[0]
+		if len(keys) > 1 {
+			cfg.ApiKeys = keys[1:]
+		}
+	}
 	cfg.RequireApiKey = requireApiKey
 	if password != "" {
 		cfg.Password = password
@@ -1032,9 +1064,9 @@ type TelegramConfig struct {
 	BotToken     string `json:"botToken"`
 	UserID       string `json:"userID"`
 	ConnectToken string `json:"connectToken"`
-	Interval     int    `json:"interval"`     // minutes
-	NotifyLevel  string `json:"notifyLevel"`  // critical / normal / frequent
-	NotifyLang   string `json:"notifyLang"`   // vi / en / zh
+	Interval     int    `json:"interval"`    // minutes
+	NotifyLevel  string `json:"notifyLevel"` // critical / normal / frequent
+	NotifyLang   string `json:"notifyLang"`  // vi / en / zh
 }
 
 // GetTelegramConfig returns the current Telegram notification settings.
@@ -1145,4 +1177,3 @@ func UpdateProfileRoutingSettings(id, profileArn string, weight int, allowOverag
 	}
 	return nil
 }
-

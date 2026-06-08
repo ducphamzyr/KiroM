@@ -2053,8 +2053,8 @@
                         <span data-i18n="settings.enableApiKey"></span>
                     </label>
                 </div>
-                <div class="form-group"><label>API Key</label><div style="display:flex;gap:8px;align-items:stretch"><input type="text" id="apiKeyInput" style="flex:1"
-                        data-i18n-placeholder="settings.apiKeyPlaceholder"><button class="btn btn-sm btn-secondary" onclick="generateApiKey()" data-i18n="settings.generateApiKey"></button></div></div>
+                <div class="form-group"><label>API Keys</label><div style="display:flex;gap:8px;align-items:stretch"><textarea id="apiKeyInput" rows="5" style="flex:1;resize:vertical"
+                        data-i18n-placeholder="settings.apiKeyPlaceholder"></textarea><button class="btn btn-sm btn-secondary" onclick="generateApiKey()" data-i18n="settings.generateApiKey"></button></div><small style="color:#64748b;font-size:12px;margin-top:4px;display:block" data-i18n="settings.apiKeysHint"></small></div>
                 <div class="form-group">
                     <label style="display:flex;align-items:center;gap:10px">
                         <label class="switch"><input type="checkbox" id="allowOverUsage"><span
@@ -2485,7 +2485,8 @@
                 "time.days": "ngày",
                 "settings.apiSettings": "Cài đặt API",
                 "settings.enableApiKey": "Bật xác thực API Key",
-                "settings.apiKeyPlaceholder": "Để trống để không xác thực",
+                "settings.apiKeyPlaceholder": "Mỗi dòng một API key",
+                "settings.apiKeysHint": "Key đầu tiên giữ tương thích với cấu hình cũ. Có thể dùng Bearer token hoặc X-Api-Key.",
                 "settings.generateApiKey": "Tạo ngẫu nhiên",
                 "settings.usageSettings": "Kiểm soát sử dụng",
                 "settings.allowOverUsage": "Cho phép dùng vượt hạn mức",
@@ -2849,7 +2850,8 @@
                 'time.days': 'd',
                 'settings.apiSettings': 'API Settings',
                 'settings.enableApiKey': 'Enable API Key Verification',
-                'settings.apiKeyPlaceholder': 'Leave empty to disable',
+                'settings.apiKeyPlaceholder': 'One API key per line',
+                'settings.apiKeysHint': 'The first key stays compatible with the legacy single-key config. Bearer token and X-Api-Key are both accepted.',
                 'settings.generateApiKey': 'Generate',
                 'settings.usageSettings': 'Usage Control',
                 'settings.allowOverUsage': 'Allow Over-Usage',
@@ -3213,7 +3215,8 @@
                 "time.days": "天",
                 "settings.apiSettings": "API 设置",
                 "settings.enableApiKey": "启用 API Key 校验",
-                "settings.apiKeyPlaceholder": "留空则不校验",
+                "settings.apiKeyPlaceholder": "每行一个 API Key",
+                "settings.apiKeysHint": "第一个 Key 会兼容旧版单 Key 配置。支持 Bearer token 和 X-Api-Key。",
                 "settings.generateApiKey": "随机生成",
                 "settings.usageSettings": "用量控制",
                 "settings.allowOverUsage": "允许超额使用",
@@ -4613,7 +4616,8 @@
             const res = await fetch('/admin/api/settings', { headers: { 'X-Admin-Password': password } });
             const d = await res.json();
             document.getElementById('requireApiKey').checked = d.requireApiKey;
-            document.getElementById('apiKeyInput').value = d.apiKey || '';
+            const apiKeys = Array.isArray(d.apiKeys) && d.apiKeys.length ? d.apiKeys : (d.apiKey ? [d.apiKey] : []);
+            document.getElementById('apiKeyInput').value = apiKeys.join('\n');
             document.getElementById('allowOverUsage').checked = d.allowOverUsage || false;
             loadThinkingConfig();
             loadEndpointConfig();
@@ -4870,7 +4874,10 @@
             const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
             let key = 'sk-';
             for (let i = 0; i < 32; i++) key += chars.charAt(Math.floor(Math.random() * chars.length));
-            document.getElementById('apiKeyInput').value = key;
+            const input = document.getElementById('apiKeyInput');
+            const keys = input.value.split(/\r?\n/).map(k => k.trim()).filter(Boolean);
+            keys.push(key);
+            input.value = Array.from(new Set(keys)).join('\n');
         }
         async function saveSettings() {
             const requireApiKey = document.getElementById('requireApiKey').checked;
@@ -4878,10 +4885,11 @@
             if (requireApiKey && !apiKeyInput.value.trim()) {
                 generateApiKey();
             }
+            const apiKeys = apiKeyInput.value.split(/[\r\n,]+/).map(k => k.trim()).filter(Boolean);
             const allowOverUsage = document.getElementById('allowOverUsage').checked;
             await fetch('/admin/api/settings', {
                 method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Admin-Password': password },
-                body: JSON.stringify({ requireApiKey, apiKey: apiKeyInput.value, allowOverUsage })
+                body: JSON.stringify({ requireApiKey, apiKey: apiKeys[0] || '', apiKeys, allowOverUsage })
             });
             alert(t('detail.saved'));
         }
@@ -4970,7 +4978,10 @@
             try {
                 const res = await fetch('/admin/api/settings', { headers: { 'X-Admin-Password': password } });
                 const d = await res.json();
-                if (d.requireApiKey && d.apiKey) return d.apiKey;
+                if (d.requireApiKey) {
+                    if (Array.isArray(d.apiKeys) && d.apiKeys.length) return d.apiKeys[0];
+                    if (d.apiKey) return d.apiKey;
+                }
             } catch (e) {}
             return '';
         }

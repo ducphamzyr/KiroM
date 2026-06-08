@@ -1,6 +1,11 @@
 package proxy
 
-import "testing"
+import (
+	"kiro-go/config"
+	"net/http"
+	"path/filepath"
+	"testing"
+)
 
 func TestThinkingSourceReasoningFirst(t *testing.T) {
 	var source thinkingStreamSource
@@ -13,6 +18,31 @@ func TestThinkingSourceReasoningFirst(t *testing.T) {
 	}
 	if allowTagSource(&source) {
 		t.Fatalf("expected tag source to be rejected after reasoning source selected")
+	}
+}
+
+func TestValidateApiKeyAcceptsLegacyAndAdditionalKeys(t *testing.T) {
+	cfgPath := filepath.Join(t.TempDir(), "config.json")
+	if err := config.Init(cfgPath); err != nil {
+		t.Fatalf("init config: %v", err)
+	}
+	if err := config.UpdateSettings("sk-legacy", []string{"sk-extra", "sk-extra-2"}, true, ""); err != nil {
+		t.Fatalf("update settings: %v", err)
+	}
+
+	h := &Handler{}
+	for _, key := range []string{"sk-legacy", "sk-extra", "sk-extra-2"} {
+		req, _ := http.NewRequest("GET", "/v1/models", nil)
+		req.Header.Set("Authorization", "Bearer "+key)
+		if !h.validateApiKey(req) {
+			t.Fatalf("expected key %q to be accepted", key)
+		}
+	}
+
+	req, _ := http.NewRequest("GET", "/v1/models", nil)
+	req.Header.Set("X-Api-Key", "sk-missing")
+	if h.validateApiKey(req) {
+		t.Fatalf("expected unknown key to be rejected")
 	}
 }
 

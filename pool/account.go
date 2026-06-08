@@ -217,11 +217,19 @@ func (p *AccountPool) ModelCacheStats() ModelCacheStats {
 // accountHasModel Kiểm tra tài khoản có hỗ trợ model chỉ định không.
 // Nếu tài khoản chưa có danh sách model (cold start), coi như hỗ trợ tất cả.
 func (p *AccountPool) accountHasModel(accountID, model string) bool {
+	normalized := strings.ToLower(strings.TrimSpace(model))
+	// Virtual/alias models (auto, gpt-*, etc.) are not present in the upstream
+	// model list — the translator maps them to a real Claude model downstream.
+	// Filtering by them would incorrectly skip every account, so treat any
+	// non-concrete-claude model as "supported by all".
+	if !strings.HasPrefix(normalized, "claude-") {
+		return true
+	}
 	list, ok := p.modelLists[accountID]
 	if !ok || len(list) == 0 {
 		return true // 冷启动：列表未就绪，乐观放行
 	}
-	return list[strings.ToLower(strings.TrimSpace(model))]
+	return list[normalized]
 }
 
 // GetNextForModel Lấy tài khoản khả dụng tiếp theo hỗ trợ model chỉ định.

@@ -1,6 +1,7 @@
 package proxy
 
 import (
+	"crypto/subtle"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -34,7 +35,7 @@ type Handler struct {
 	stopRefresh     chan struct{}
 	stopStatsSaver  chan struct{}
 	// Telegram health notifier
-	telegram        *telegramNotifier
+	telegram *telegramNotifier
 	// Cache model
 	cachedModels    []ModelInfo
 	modelsCacheMu   sync.RWMutex
@@ -316,8 +317,8 @@ func (h *Handler) validateApiKey(r *http.Request) bool {
 		return true
 	}
 
-	expectedKey := config.GetApiKey()
-	if expectedKey == "" {
+	expectedKeys := config.GetApiKeys()
+	if len(expectedKeys) == 0 {
 		return true
 	}
 
@@ -332,7 +333,12 @@ func (h *Handler) validateApiKey(r *http.Request) bool {
 		providedKey = apiKeyHeader
 	}
 
-	return providedKey == expectedKey
+	for _, expectedKey := range expectedKeys {
+		if subtle.ConstantTimeCompare([]byte(providedKey), []byte(expectedKey)) == 1 {
+			return true
+		}
+	}
+	return false
 }
 
 // ServeHTTP Phân phối route
@@ -2174,6 +2180,9 @@ func (h *Handler) apiGetAccounts(w http.ResponseWriter, r *http.Request) {
 				enabledProfiles[profileArn] = true
 			}
 		}
+		if a.ProfileArns == nil && strings.TrimSpace(a.ProfileArn) != "" {
+			enabledProfiles[strings.TrimSpace(a.ProfileArn)] = true
+		}
 		profileArns := mergeProfileArns(a.KnownProfileArns, a.ProfileArns, []string{a.ProfileArn})
 		profileRoutes := make([]map[string]interface{}, 0, len(profileArns))
 		for _, profileArn := range profileArns {
@@ -2961,6 +2970,7 @@ func (h *Handler) apiGetCacheStats(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) apiGetSettings(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"apiKey":         config.GetApiKey(),
+		"apiKeys":        config.GetApiKeys(),
 		"requireApiKey":  config.IsApiKeyRequired(),
 		"port":           config.GetPort(),
 		"host":           config.GetHost(),
@@ -3013,10 +3023,11 @@ func (h *Handler) apiUpdatePromptFilter(w http.ResponseWriter, r *http.Request) 
 
 func (h *Handler) apiUpdateSettings(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		ApiKey         string `json:"apiKey"`
-		RequireApiKey  bool   `json:"requireApiKey"`
-		Password       string `json:"password"`
-		AllowOverUsage *bool  `json:"allowOverUsage,omitempty"`
+		ApiKey         string   `json:"apiKey"`
+		ApiKeys        []string `json:"apiKeys"`
+		RequireApiKey  bool     `json:"requireApiKey"`
+		Password       string   `json:"password"`
+		AllowOverUsage *bool    `json:"allowOverUsage,omitempty"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		w.WriteHeader(400)
@@ -3024,7 +3035,7 @@ func (h *Handler) apiUpdateSettings(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := config.UpdateSettings(req.ApiKey, req.RequireApiKey, req.Password); err != nil {
+	if err := config.UpdateSettings(req.ApiKey, req.ApiKeys, req.RequireApiKey, req.Password); err != nil {
 		w.WriteHeader(500)
 		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
 		return

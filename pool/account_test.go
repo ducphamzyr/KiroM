@@ -190,3 +190,32 @@ func TestNearExpiredTokenRouteCanBeSelectedForRefresh(t *testing.T) {
 		t.Fatalf("expected near-expired route to be selected so token refresh can run")
 	}
 }
+
+func TestGetNextForModelVirtualModelsBypassFilter(t *testing.T) {
+	p := &AccountPool{
+		cooldowns:   make(map[string]time.Time),
+		errorCounts: make(map[string]int),
+		modelLists:  make(map[string]map[string]bool),
+	}
+	account := config.Account{ID: "acct-1", AccessToken: "tok"}
+	p.accounts = []config.Account{account}
+	// Account advertises only concrete claude models (no "auto"/"gpt-4o").
+	p.modelLists["acct-1"] = map[string]bool{"claude-sonnet-4.5": true}
+
+	// Virtual/alias models must still route (mapped downstream).
+	for _, model := range []string{"auto", "gpt-4o", "gpt-4"} {
+		if got := p.GetNextForModel(model); got == nil {
+			t.Fatalf("expected virtual model %q to route to an account", model)
+		}
+	}
+
+	// A concrete claude model not in the list should still be filtered out.
+	if got := p.GetNextForModel("claude-opus-4.5"); got != nil {
+		t.Fatalf("expected unsupported concrete model to be filtered, got %q", got.RouteID())
+	}
+
+	// A supported concrete model routes fine.
+	if got := p.GetNextForModel("claude-sonnet-4.5"); got == nil {
+		t.Fatal("expected supported concrete model to route")
+	}
+}

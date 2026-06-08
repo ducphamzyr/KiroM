@@ -3,6 +3,7 @@ kiro-go.exe
 kiro-go
 kirom
 kirom.exe
+dist/
 
 # Runtime data (sensitive)
 data/config.json
