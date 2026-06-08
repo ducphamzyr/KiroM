@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="80" height="80" viewBox="0 0 80 80">
+  <rect width="80" height="80" rx="16" fill="#0f766e"/>
+  <text x="40" y="52" text-anchor="middle" font-family="system-ui,-apple-system,sans-serif" font-size="24" font-weight="700" fill="white">KM</text>
+  <path d="M40 14L28 30h8l-2 12 14-16h-8l2-12z" fill="rgba(255,255,255,0.3)"/>
+</svg>

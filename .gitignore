@@ -1,0 +1,24 @@
+# Binary
+kiro-go.exe
+kiro-go
+kirom
+kirom.exe
+
+# Runtime data (sensitive)
+data/config.json
+!data/config.example.json
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Temp
+tmp_*
+*.log
